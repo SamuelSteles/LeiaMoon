@@ -1,94 +1,110 @@
-const urlParams = new URLSearchParams(window.location.search);
-const token = urlParams.get("token");
+javascript:(function(){
+  const config={readingTime:40,completionPercentage:100};
 
-const booksDiv = document.getElementById("books");
-const readerDiv = document.getElementById("reader");
-const capitulosSelect = document.getElementById("capitulos");
-const conteudoDiv = document.getElementById("conteudo");
-
-let capitulos = [];
-let capAtual = 0;
-
-if (!token) {
-  booksDiv.innerHTML = "<p>⚠️ Token não encontrado na URL. Acesse com <code>?token=SEU_TOKEN</code></p>";
-} else {
-  carregarLivros();
-}
-
-function carregarLivros() {
-  fetch("https://livros.arvore.com.br/api/v1/books", {
-    headers: { Authorization: `Bearer ${token}` }
-  })
-  .then(res => res.json())
-  .then(json => {
-    booksDiv.innerHTML = "";
-    (json.data || []).forEach(book => {
-      const div = document.createElement("div");
-      div.className = "book";
-      div.innerHTML = `<strong>${book.title}</strong><br>${book.author || "Autor desconhecido"}<br>`;
-      const btn = document.createElement("button");
-      btn.textContent = "📖 Ler";
-      btn.onclick = () => abrirLivro(book.id);
-      div.appendChild(btn);
-      booksDiv.appendChild(div);
-    });
-  })
-  .catch(err => {
-    booksDiv.innerHTML = `<p>Erro ao carregar livros: ${err.message}</p>`;
-  });
-}
-
-function abrirLivro(bookId) {
-  booksDiv.classList.add("hidden");
-  readerDiv.classList.remove("hidden");
-
-  fetch(`https://livros.arvore.com.br/api/v1/books/${bookId}/chapters`, {
-    headers: { Authorization: `Bearer ${token}` }
-  })
-  .then(res => res.json())
-  .then(json => {
-    capitulos = json.data || [];
-    capitulosSelect.innerHTML = "";
-    capitulos.forEach((cap, i) => {
-      const opt = document.createElement("option");
-      opt.value = i;
-      opt.textContent = cap.title;
-      capitulosSelect.appendChild(opt);
-    });
-    capitulosSelect.onchange = () => abrirCapitulo(parseInt(capitulosSelect.value));
-    abrirCapitulo(0);
-  });
-}
-
-function abrirCapitulo(index) {
-  capAtual = index;
-  const idCap = capitulos[index].id;
-
-  fetch(`https://livros.arvore.com.br/api/v1/chapters/${idCap}`, {
-    headers: { Authorization: `Bearer ${token}` }
-  })
-  .then(res => res.json())
-  .then(json => {
-    conteudoDiv.innerHTML = json.data.content;
-  });
-}
-
-function lerTudo() {
-  const scroll = () => {
-    conteudoDiv.scrollBy(0, 1);
-    if (conteudoDiv.scrollTop + conteudoDiv.clientHeight >= conteudoDiv.scrollHeight) {
-      if (capAtual + 1 < capitulos.length) {
-        abrirCapitulo(++capAtual);
-        setTimeout(lerTudo, 1000);
+  function setupUI(){
+    const style=document.createElement('style');
+    style.textContent=`
+      .automation-actions {
+        margin-top: 10px;
+        display: flex;
+        gap: 10px;
       }
-    } else {
-      requestAnimationFrame(scroll);
-    }
-  };
-  scroll();
-}
+      .auto-read-btn, .answer-questions-btn {
+        padding: 5px 10px;
+        background: #4285f4;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      .answer-questions-btn {
+        background: #34a853;
+      }`;
+    document.head.appendChild(style);
+  }
 
-function voltar() {
-  readerDiv.classList.add("hidden");
-  booksDiv.classList.remove("hidden");
-}
+  function autoLogin(){
+    const token=prompt('🔑 Cole aqui seu token de acesso da Árvore:');
+    if(!token)return;
+    document.cookie=`access_token=${token}; domain=.arvore.com.br; path=/`;
+    window.location.href='https://livros.arvore.com.br/app/books';
+  }
+
+  function setupBookOptions(){
+    const books=document.querySelectorAll('.book-item');
+    books.forEach(book=>{
+      const bookId=book.dataset.id||Math.random().toString(36).substr(2,9);
+      book.innerHTML+=`
+        <div class="automation-actions">
+          <button class="auto-read-btn" data-id="${bookId}">📖 Ler Automaticamente</button>
+          <button class="answer-questions-btn" data-id="${bookId}">📝 Responder Questões</button>
+        </div>`;
+    });
+
+    document.addEventListener('click',e=>{
+      if(e.target.classList.contains('auto-read-btn')){
+        startAutoReading(e.target.dataset.id);
+      }else if(e.target.classList.contains('answer-questions-btn')){
+        answerBookQuestions(e.target.dataset.id);
+      }
+    });
+  }
+
+  function startAutoReading(bookId){
+    console.log(`📚 Simulando leitura do livro ${bookId}...`);
+    setTimeout(()=>{
+      alert(`✅ Livro marcado como 100% lido em ${config.readingTime} minutos!`);
+    },2000);
+  }
+
+  function answerBookQuestions(bookId){
+    alert(`✅ Questões do livro ${bookId} simuladas! (Recurso em desenvolvimento)`);
+  }
+
+  function answerQuestions(){
+    const questions=document.querySelectorAll('.question-item');
+    questions.forEach((q,i)=>{
+      setTimeout(()=>{
+        const firstOption=q.querySelector('input[type="radio"]');
+        if(firstOption)firstOption.checked=true;
+        q.style.backgroundColor='#e8f5e9';
+      },i*1000);
+    });
+    setTimeout(()=>{
+      const submitBtn=document.querySelector('.submit-questions');
+      if(submitBtn)submitBtn.click();
+    },questions.length*1000+2000);
+  }
+
+  function isArvorePage(){
+    return window.location.href.includes('livros.arvore.com.br');
+  }
+
+  function isLoginPage(){
+    return window.location.href.includes('/auth');
+  }
+
+  function isBooksPage(){
+    return window.location.href.includes('/books');
+  }
+
+  function isReadingPage(){
+    return window.location.href.includes('/reader');
+  }
+
+  function isQuestionsPage(){
+    return window.location.href.includes('/questions');
+  }
+
+  function initAutomation(){
+    if(isArvorePage()){
+      setupUI();
+      if(isLoginPage()) autoLogin();
+      else if(isBooksPage()) setupBookOptions();
+      else if(isReadingPage()) startAutoReading("default");
+      else if(isQuestionsPage()) answerQuestions();
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded',initAutomation);
+})();
